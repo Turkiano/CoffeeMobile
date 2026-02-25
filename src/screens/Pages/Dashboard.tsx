@@ -1,105 +1,146 @@
-import React, { useEffect, useState } from "react";
-import { View, ScrollView, StyleSheet } from "react-native";
-import { Text, ActivityIndicator, Button } from "react-native-paper";
-import { UserTypes } from "../../types";
+import React, { useState } from "react";
+import { View, ScrollView, StyleSheet, FlatList } from "react-native";
+import { Text, ActivityIndicator, TextInput, Button, Card } from "react-native-paper";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { ProductTypes } from "../../types";
 import api from "../../services/api";
+import { useGlobalContext } from "../../context/GlobalContext";
 
 /**
- * Dashboard Screen
- * Displays user profile, order history, and account settings
+ * Dashboard Screen (React Native)
+ * Admin-style dashboard: add product, list products, delete/edit placeholders
  */
 export const Dashboard: React.FC = () => {
-  const [user, setUser] = useState<UserTypes | null>(null);
-  const [loading, setLoading] = useState(true);
+  const queryClient = useQueryClient();
+  const [product, setProduct] = useState<Partial<ProductTypes>>({
+    name: "",
+    categoryId: "",
+    image: "",
+    quantity: 0,
+    price: 0,
+    description: "",
+  });
 
-  useEffect(() => {
-    fetchUserProfile();
-  }, []);
+  const [selectedTab, setSelectedTab] = useState<"users" | "products" | "categories">("products");
 
-  const fetchUserProfile = async () => {
+  const handleChange = (field: keyof Partial<ProductTypes>, value: string) => {
+    setProduct((prev) => ({ ...prev, [field]: field === "price" || field === "quantity" ? Number(value) : value }));
+  };
+
+  const getProducts = async (): Promise<ProductTypes[]> => {
+    const res = await api.get("/products");
+    return res.data;
+  };
+
+  const { data: products, error, isLoading } = useQuery<ProductTypes[]>({
+    queryKey: ["products"],
+    queryFn: getProducts,
+  });
+
+  const deleteProduct = async (productId: string) => {
     try {
-      setLoading(true);
-      const response = await api.get("/users/profile");
-      setUser(response.data);
-    } catch (error) {
-      console.error("Failed to fetch user profile", error);
-    } finally {
-      setLoading(false);
+      const res = await api.delete(`/products/${productId}`);
+      return res.data;
+    } catch (err) {
+      console.error(err);
+      throw err;
     }
   };
 
-  if (loading) {
-    return (
-      <View style={styles.centerContainer}>
-        <ActivityIndicator animating={true} size="large" />
-      </View>
-    );
-  }
+  const handleDeleteProduct = async (id: string) => {
+    await deleteProduct(id);
+    queryClient.invalidateQueries({ queryKey: ["products"] });
+  };
+
+  const postProduct = async () => {
+    try {
+      const payload = {
+        name: product.name,
+        categoryId: product.categoryId,
+        image: product.image,
+        quantity: product.quantity || 0,
+        price: product.price || 0,
+        description: product.description || "",
+      };
+      const res = await api.post("/products", payload);
+      return res.data;
+    } catch (err) {
+      console.error(err);
+      throw err;
+    }
+  };
+
+  const handleSubmit = async () => {
+    await postProduct();
+    setProduct({ name: "", categoryId: "", image: "", quantity: 0, price: 0, description: "" });
+    queryClient.invalidateQueries({ queryKey: ["products"] });
+  };
+
+  if (isLoading) return (
+    <View style={styles.centerContainer}><ActivityIndicator animating size={"large"} /></View>
+  );
+  if (error) return <View style={styles.centerContainer}><Text>Error loading product data</Text></View>;
+
+  const renderProduct = ({ item }: { item: ProductTypes }) => (
+    <Card style={styles.productCard} key={item.productId}>
+      <Card.Title title={item.name} subtitle={`SAR ${item.price}`} />
+      <Card.Content>
+        <Text>Category: {item.categoryId}</Text>
+        <Text>Quantity: {item.quantity}</Text>
+      </Card.Content>
+      <Card.Actions>
+        <Button mode="outlined" onPress={() => {/* TODO: edit flow */}}>Edit</Button>
+        <Button mode="contained" onPress={() => handleDeleteProduct(item.productId)}>Delete</Button>
+      </Card.Actions>
+    </Card>
+  );
 
   return (
-    <ScrollView style={styles.container}>
-      <View style={styles.content}>
-        <Text variant="headlineMedium" style={styles.title}>
-          My Dashboard
-        </Text>
-
-        {user && (
-          <>
-            <View style={styles.profileCard}>
-              <Text variant="titleMedium">Profile Information</Text>
-              <Text variant="bodyMedium">
-                Name: {user.firstName} {user.lastName}
-              </Text>
-              <Text variant="bodyMedium">Email: {user.email}</Text>
-              <Text variant="bodyMedium">Phone: {user.phone}</Text>
-              <Text variant="bodyMedium">Role: {user.role}</Text>
-            </View>
-
-            {/* TODO: Add order history, addresses, preferences */}
-
-            <Button mode="outlined" style={styles.button}>
-              Edit Profile
-            </Button>
-
-            <Button mode="outlined" style={styles.button}>
-              View Orders
-            </Button>
-
-            <Button mode="outlined" style={styles.button}>
-              Logout
-            </Button>
-          </>
-        )}
+    <ScrollView style={styles.container} contentContainerStyle={styles.contentContainer}>
+      <View style={styles.formCard}>
+        <Text style={styles.heading}>Add New Product</Text>
+        <TextInput label="Name" value={product.name as string} onChangeText={(v) => handleChange("name", v)} style={styles.input} />
+        <TextInput label="Category Id" value={product.categoryId as string} onChangeText={(v) => handleChange("categoryId", v)} style={styles.input} />
+        <TextInput label="Price" value={String(product.price ?? "")} onChangeText={(v) => handleChange("price", v)} keyboardType="numeric" style={styles.input} />
+        <Button mode="contained" onPress={handleSubmit} style={styles.submitBtn}>Submit</Button>
       </View>
+
+      <View style={styles.tabs}>
+        <Button mode={selectedTab === "users" ? "contained" : "outlined"} onPress={() => setSelectedTab("users")} style={styles.tabBtn}>Users</Button>
+        <Button mode={selectedTab === "products" ? "contained" : "outlined"} onPress={() => setSelectedTab("products")} style={styles.tabBtn}>Products</Button>
+        <Button mode={selectedTab === "categories" ? "contained" : "outlined"} onPress={() => setSelectedTab("categories")} style={styles.tabBtn}>Categories</Button>
+      </View>
+
+      {selectedTab === "products" && (
+        <View style={styles.productsList}>
+          <Text style={styles.sectionTitle}>Products</Text>
+          <FlatList data={products} renderItem={renderProduct} keyExtractor={(i) => i.productId} />
+        </View>
+      )}
+
+      {selectedTab === "users" && (
+        <View style={styles.emptySection}><Text>Users management UI (TODO)</Text></View>
+      )}
+
+      {selectedTab === "categories" && (
+        <View style={styles.emptySection}><Text>Categories management UI (TODO)</Text></View>
+      )}
     </ScrollView>
   );
 };
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: "#fff",
-  },
-  centerContainer: {
-    flex: 1,
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  content: {
-    padding: 20,
-    paddingTop: 40,
-  },
-  title: {
-    marginBottom: 20,
-    textAlign: "center",
-  },
-  profileCard: {
-    backgroundColor: "#f5f5f5",
-    padding: 15,
-    borderRadius: 8,
-    marginBottom: 20,
-  },
-  button: {
-    marginBottom: 12,
-  },
+  container: { flex: 1, backgroundColor: "#fff" },
+  contentContainer: { padding: 16, paddingBottom: 40 },
+  centerContainer: { flex: 1, justifyContent: "center", alignItems: "center" },
+  formCard: { marginBottom: 20, backgroundColor: "#f9f9f9", padding: 12, borderRadius: 8 },
+  heading: { fontSize: 18, fontWeight: "700", marginBottom: 12 },
+  input: { marginBottom: 10, backgroundColor: "transparent" },
+  submitBtn: { marginTop: 8 },
+  tabs: { flexDirection: "row", justifyContent: "space-around", marginBottom: 16 },
+  tabBtn: { flex: 1, marginHorizontal: 6 },
+  productsList: {},
+  productCard: { marginBottom: 12 },
+  sectionTitle: { fontSize: 20, fontWeight: "700", marginBottom: 8 },
+  emptySection: { padding: 20, alignItems: "center" },
 });
