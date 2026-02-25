@@ -1,9 +1,10 @@
-import React, { useEffect, useState } from "react";
+import React from "react";
 import { View, ScrollView, StyleSheet, Image } from "react-native";
 import { Text, Button, ActivityIndicator } from "react-native-paper";
 import { NativeStackScreenProps } from "@react-navigation/native-stack";
 import { ProductTypes } from "../../types";
 import { useGlobalContext } from "../../context/GlobalContext";
+import { useQuery } from "@tanstack/react-query";
 import api from "../../services/api";
 
 type RootStackParamList = {
@@ -14,31 +15,28 @@ type Props = NativeStackScreenProps<RootStackParamList, "ProductDetails">;
 
 /**
  * Product Details Screen
- * Displays detailed information about a single product
+ * Uses React Query to fetch product by id from route params
  */
 export const ProductDetails: React.FC<Props> = ({ route }) => {
   const { productId } = route.params;
-  const [product, setProduct] = useState<ProductTypes | null>(null);
-  const [loading, setLoading] = useState(true);
   const { handleAddToCart } = useGlobalContext();
 
-  useEffect(() => {
-    fetchProductDetails();
-  }, [productId]);
-
-  const fetchProductDetails = async () => {
-    try {
-      setLoading(true);
-      const response = await api.get(`/products/${productId}`);
-      setProduct(response.data);
-    } catch (error) {
-      console.error("Failed to fetch product details", error);
-    } finally {
-      setLoading(false);
-    }
+  const getProduct = async (): Promise<ProductTypes> => {
+    const res = await api.get(`/products/${productId}`);
+    return res.data;
   };
 
-  if (loading) {
+  const {
+    data: product,
+    error,
+    isLoading,
+  } = useQuery<ProductTypes>({
+    queryKey: ["productDetails", productId],
+    queryFn: getProduct,
+    enabled: !!productId,
+  });
+
+  if (isLoading) {
     return (
       <View style={styles.centerContainer}>
         <ActivityIndicator animating={true} size="large" />
@@ -46,7 +44,7 @@ export const ProductDetails: React.FC<Props> = ({ route }) => {
     );
   }
 
-  if (!product) {
+  if (error || !product) {
     return (
       <View style={styles.centerContainer}>
         <Text>Product not found</Text>

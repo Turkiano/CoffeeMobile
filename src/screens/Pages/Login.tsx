@@ -1,38 +1,68 @@
 import React, { useState } from "react";
 import { View, ScrollView, StyleSheet, Alert } from "react-native";
 import { TextInput, Button, Text } from "react-native-paper";
-import { LoginCredentials } from "../../types";
+import { NativeStackScreenProps } from "@react-navigation/native-stack";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import api from "../../services/api";
+
+type RootStackParamList = {
+  Login: undefined;
+  Home: undefined;
+  SignUp: undefined;
+};
+
+type Props = NativeStackScreenProps<RootStackParamList, "Login">;
 
 /**
  * Login Screen
- * Handles user authentication
+ * Handles user authentication with email and password
  */
-export const Login: React.FC = () => {
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
+export const Login: React.FC<Props> = ({ navigation }) => {
+  const [user, setUser] = useState({
+    email: "",
+    password: "",
+  });
+
+  const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
 
-  const handleLogin = async () => {
-    if (!email || !password) {
-      Alert.alert("Validation Error", "Please fill in all fields");
+  const handleChange = (field: string, value: string) => {
+    setUser((prev) => ({ ...prev, [field]: value }));
+  };
+
+  const handleSubmit = async () => {
+    setError(null);
+
+    if (!user.email || !user.password) {
+      setError("Please fill in all fields");
       return;
     }
 
-    const credentials: LoginCredentials = {
-      email,
-      password,
-    };
-
     try {
       setLoading(true);
-      const response = await api.post("/auth/login", credentials);
-      // TODO: Store token and navigate to home
-      Alert.alert("Success", "Logged in successfully");
+
+      const res = await api.post("/users/login", user);
+
+      console.log("Full login response data:", res.data);
+
+      // res.data IS the token
+      const token = res.data;
+
+      if (!token) {
+        setError("Login failed: No token received.");
+        return;
+      }
+
+      // Save token to AsyncStorage
+      await AsyncStorage.setItem("token", token);
+
+      // Navigate to home
+      navigation.replace("Home");
     } catch (error) {
-      Alert.alert("Login Failed", "Invalid email or password");
-      console.error(error);
+      console.error("Login error:", error);
+      setError("Wrong email or password. Please try again.");
+      Alert.alert("Login Failed", "Wrong email or password. Please try again.");
     } finally {
       setLoading(false);
     }
@@ -42,45 +72,61 @@ export const Login: React.FC = () => {
     <ScrollView style={styles.container}>
       <View style={styles.content}>
         <Text variant="headlineMedium" style={styles.title}>
-          Welcome Back
+          Login Page
         </Text>
 
-        <TextInput
-          label="Email"
-          value={email}
-          onChangeText={setEmail}
-          keyboardType="email-address"
-          autoCapitalize="none"
-          mode="outlined"
-          style={styles.input}
-        />
+        <View style={styles.form}>
+          <TextInput
+            label="Email"
+            value={user.email}
+            onChangeText={(value) => handleChange("email", value)}
+            keyboardType="email-address"
+            autoCapitalize="none"
+            mode="outlined"
+            style={styles.input}
+            placeholder="Enter your email"
+          />
 
-        <TextInput
-          label="Password"
-          value={password}
-          onChangeText={setPassword}
-          secureTextEntry={!showPassword}
-          mode="outlined"
-          style={styles.input}
-          right={
-            <TextInput.Icon
-              icon={showPassword ? "eye" : "eye-off"}
-              onPress={() => setShowPassword(!showPassword)}
-            />
-          }
-        />
+          <TextInput
+            label="Password"
+            value={user.password}
+            onChangeText={(value) => handleChange("password", value)}
+            secureTextEntry={!showPassword}
+            mode="outlined"
+            style={styles.input}
+            placeholder="Enter your password"
+            right={
+              <TextInput.Icon
+                icon={showPassword ? "eye" : "eye-off"}
+                onPress={() => setShowPassword(!showPassword)}
+              />
+            }
+          />
 
-        <Button
-          mode="contained"
-          onPress={handleLogin}
-          loading={loading}
-          disabled={loading}
-          style={styles.button}
-        >
-          Login
-        </Button>
+          {error && <Text style={styles.errorText}>{error}</Text>}
 
-        {/* TODO: Add sign up and forgot password links */}
+          <Button
+            mode="contained"
+            onPress={handleSubmit}
+            loading={loading}
+            disabled={loading}
+            style={styles.submitButton}
+          >
+            Login
+          </Button>
+
+          <View style={styles.signupContainer}>
+            <Text variant="bodyMedium">
+              Create an Account{" "}
+              <Text
+                style={styles.signupLink}
+                onPress={() => navigation.navigate("SignUp")}
+              >
+                here
+              </Text>
+            </Text>
+          </View>
+        </View>
       </View>
     </ScrollView>
   );
@@ -93,17 +139,34 @@ const styles = StyleSheet.create({
   },
   content: {
     padding: 20,
-    paddingTop: 40,
+    paddingTop: 60,
   },
   title: {
-    marginBottom: 30,
+    marginBottom: 40,
     textAlign: "center",
+    fontWeight: "bold",
+  },
+  form: {
+    width: "100%",
   },
   input: {
-    marginBottom: 15,
+    marginBottom: 16,
   },
-  button: {
-    marginTop: 10,
+  submitButton: {
+    marginTop: 8,
     paddingVertical: 6,
+  },
+  errorText: {
+    color: "#ef4444",
+    marginBottom: 12,
+    fontSize: 14,
+  },
+  signupContainer: {
+    marginTop: 20,
+    alignItems: "center",
+  },
+  signupLink: {
+    color: "#2563eb",
+    fontWeight: "600",
   },
 });

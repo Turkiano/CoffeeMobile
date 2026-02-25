@@ -54,7 +54,7 @@ export const Receipt: React.FC<Props> = ({ route }) => {
 
   const subtotal = order.items.reduce(
     (sum, item) => sum + item.unitPrice * item.quantity,
-    0
+    0,
   );
 
   return (

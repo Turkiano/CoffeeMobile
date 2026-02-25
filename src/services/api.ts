@@ -3,8 +3,7 @@ import axios from "axios";
 const isDevelopment = process.env.NODE_ENV === "development";
 
 // Update this when you have a working backend
-let baseURL =
-  process.env.REACT_APP_API_URL || "http://localhost:5125/api/v1";
+let baseURL = process.env.REACT_APP_API_URL || "http://localhost:5125/api/v1";
 
 if (!isDevelopment) {
   // Update this when you have a working backend
@@ -28,7 +27,7 @@ api.interceptors.request.use(
   },
   (error) => {
     return Promise.reject(error);
-  }
+  },
 );
 
 export default api;
