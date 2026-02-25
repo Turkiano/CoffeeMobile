@@ -1,27 +1,24 @@
 import axios from "axios";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 
-const isDevelopment = process.env.NODE_ENV === "development";
-
-// Update this when you have a working backend
-let baseURL = process.env.REACT_APP_API_URL || "http://localhost:5125/api/v1";
-
-if (!isDevelopment) {
-  // Update this when you have a working backend
-  baseURL =
-    "https://coffeeapp2026-dnc9cggsfrhpfxhh.canadacentral-01.azurewebsites.net/api/v1";
-}
+// For development: use machine IP so mobile can reach backend
+// For production: use Azure URL
+let baseURL = "http://192.168.8.101:5125/api/v1";
 
 const api = axios.create({
   baseURL,
 });
 
-// Optional: Add interceptors for handling auth tokens
+// Interceptor to add Authorization token from AsyncStorage
 api.interceptors.request.use(
-  (config) => {
-    // Add token to requests if it exists
-    const token = localStorage?.getItem?.("token") || null;
-    if (token) {
-      config.headers.Authorization = `Bearer ${token}`;
+  async (config) => {
+    try {
+      const token = await AsyncStorage.getItem("token");
+      if (token) {
+        config.headers.Authorization = `Bearer ${token}`;
+      }
+    } catch (error) {
+      console.error("Failed to read token from AsyncStorage", error);
     }
     return config;
   },
