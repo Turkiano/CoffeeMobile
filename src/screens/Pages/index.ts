@@ -5,5 +5,5 @@ export { AboutUs } from "./AboutUs";
 export { Dashboard } from "./Dashboard";
 export { ProductDetails } from "./ProductDetails";
 export { Orders } from "./Orders";
-export { CoffeeShopReservation } from "./Reservation";
+export { Reservation } from "./Reservation";
 export { Receipt } from "./Receipt";

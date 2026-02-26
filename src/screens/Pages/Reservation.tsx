@@ -8,13 +8,7 @@ import {
   Alert,
   FlatList,
 } from "react-native";
-import {
-  Card,
-  Text,
-  Button,
-  TextInput,
-  RadioButton,
-} from "react-native-paper";
+import { Card, Text, Button, TextInput, RadioButton } from "react-native-paper";
 
 /**
  * Reservation Screen (React Native)

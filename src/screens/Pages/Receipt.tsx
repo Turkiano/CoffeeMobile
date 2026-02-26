@@ -24,7 +24,11 @@ export const Receipt: React.FC<Props> = ({ route }) => {
     return res.data;
   };
 
-  const { data: order, isLoading, error } = useQuery<OrderResponse>({
+  const {
+    data: order,
+    isLoading,
+    error,
+  } = useQuery<OrderResponse>({
     queryKey: ["order", orderId],
     queryFn: fetchReceipt,
     enabled: !!orderId,
